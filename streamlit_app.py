@@ -24,55 +24,61 @@ if 'categorias' not in st.session_state:
         "IA": ["ChatGPT", "Herramientas"]
     }
 if 'tasas' not in st.session_state:
-    st.session_state.tasas = {"EUR": 1.0, "ARS": 950.0, "USD": 0.92, "USDT": 1.0}
+    st.session_state.tasas = {"EUR_USD": 1.08, "USD_ARS": 950, "USDT_USD": 1.0}
 
-# --- FUNCIÓN PARA COTIZACIONES BINANCE ---
-def obtener_cotizaciones_binance():
+# --- FUNCIÓN PARA COTIZACIONES REALES ---
+def obtener_cotizaciones_reales():
     try:
-        # ARSUSDT
-        ars_data = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=ARSUSDT").json()
-        ars_price = float(ars_data['price'])
-        st.session_state.tasas["ARS"] = ars_price  # 1 USDT = X ARS
+        # EUR/USD de exchangerate-api
+        url_eur = "https://api.exchangerate-api.com/v4/latest/EUR"
+        data_eur = requests.get(url_eur).json()
+        eur_usd = data_eur['rates']['USD']
+        st.session_state.tasas["EUR_USD"] = eur_usd
 
-        # EURUSDT
-        eur_data = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=EURUSDT").json()
-        eur_price = float(eur_data['price'])
-        st.session_state.tasas["USDT"] = eur_price  # 1 EUR = X USDT
+        # USD/ARS de exchangerate-api (tasa de mercado)
+        url_ars = "https://api.exchangerate-api.com/v4/latest/USD"
+        data_ars = requests.get(url_ars).json()
+        usd_ars = data_ars['rates']['ARS']
+        st.session_state.tasas["USD_ARS"] = usd_ars
 
-        # Calcular derivados
-        st.session_state.tasas["USD"] = 1 / ars_price  # 1 ARS = X USD
-        st.session_state.tasas["EUR"] = eur_price / ars_price  # 1 ARS = X EUR
+        # USDT/USD ~1 (fijo, ya que es stablecoin)
+        st.session_state.tasas["USDT_USD"] = 1.0
 
-        st.success("Cotizaciones actualizadas desde Binance")
+        st.success("✅ Cotizaciones actualizadas (exchangerate-api)")
     except:
-        st.warning("Error de conexión - usando tasas simuladas")
+        st.warning("⚠️ Error de conexión - usando tasas simuladas")
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.header("Configuración")
+    st.header("⚙️ Configuración")
     st.session_state.ingresos["sueldo"] = st.number_input("Sueldo (€)", value=1800.0)
     st.session_state.ingresos["freelance"] = st.number_input("Freelance (€)", value=250.0)
-    if st.button("Actualizar cotizaciones (Binance)"):
-        obtener_cotizaciones_binance()
+    if st.button("🔄 Actualizar cotizaciones"):
+        obtener_cotizaciones_reales()
 
 # --- COTIZACIONES EN VIVO ---
-st.subheader("Cotizaciones en Tiempo Real (Binance)")
+st.subheader("📈 Cotizaciones en Tiempo Real")
 if st.button("Forzar actualización"):
-    obtener_cotizaciones_binance()
+    obtener_cotizaciones_reales()
+
+# Tasas calculadas
+eur_usd = st.session_state.tasas["EUR_USD"]
+usd_ars = st.session_state.tasas["USD_ARS"]
+usdt_usd = st.session_state.tasas["USDT_USD"]
 
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    st.metric("USDT → ARS", f"1 USDT = {st.session_state.tasas['ARS']:,.0f} ARS")
-    st.metric("ARS → USDT", f"1 ARS = {1/st.session_state.tasas['ARS']:.6f} USDT")
+    st.metric("USD → ARS", f"1 USD = {usd_ars:,.0f} ARS")
+    st.metric("ARS → USD", f"1 ARS = {1/usd_ars:.6f} USD")
 with col2:
-    st.metric("EUR → ARS", f"1 EUR = {st.session_state.tasas['ARS'] * st.session_state.tasas['USDT']:,.0f} ARS")
-    st.metric("ARS → EUR", f"1 ARS = {1/(st.session_state.tasas['ARS'] * st.session_state.tasas['USDT']):.6f} EUR")
+    st.metric("EUR → ARS", f"1 EUR = {eur_usd * usd_ars:,.0f} ARS")
+    st.metric("ARS → EUR", f"1 ARS = {1/(eur_usd * usd_ars):.6f} EUR")
 with col3:
-    st.metric("USD → ARS", f"1 USD = {st.session_state.tasas['ARS']:,.0f} ARS")
-    st.metric("ARS → USD", f"1 ARS = {1/st.session_state.tasas['ARS']:.6f} USD")
+    st.metric("USDT → ARS", f"1 USDT = {usdt_usd * usd_ars:,.0f} ARS")
+    st.metric("ARS → USDT", f"1 ARS = {1/(usdt_usd * usd_ars):.6f} USDT")
 with col4:
-    st.metric("EUR → USDT", f"1 EUR = {st.session_state.tasas['USDT']:.4f} USDT")
-    st.metric("USDT → EUR", f"1 USDT = {1/st.session_state.tasas['USDT']:.4f} EUR")
+    st.metric("EUR → USDT", f"1 EUR = {eur_usd / usdt_usd:.4f} USDT")
+    st.metric("USDT → EUR", f"1 USDT = {usdt_usd / eur_usd:.4f} EUR")
 
 # --- CÁLCULOS ---
 total_ingresos = sum(st.session_state.ingresos.values())
@@ -85,7 +91,7 @@ col2.metric("Ahorro Objetivo", f"€{ahorro_objetivo}")
 col3.metric("Para Gastos", f"€{presupuesto:,.2f}")
 
 # --- AGREGAR GASTO ---
-st.subheader("Agregar Gasto")
+st.subheader("➕ Agregar Gasto")
 c1, c2 = st.columns(2)
 with c1:
     monto = st.number_input("Monto", min_value=0.01)
@@ -95,23 +101,23 @@ with c2:
     sub = st.selectbox("Subcategoría", st.session_state.categorias[cat])
 desc = st.text_input("Descripción")
 
-if st.button("Guardar Gasto"):
+if st.button("💾 Guardar Gasto"):
     # Convertir a EUR
     if moneda == "EUR":
         monto_eur = monto
     elif moneda == "ARS":
-        monto_eur = monto / (st.session_state.tasas["ARS"] * st.session_state.tasas["USDT"])
+        monto_eur = monto / (usd_ars * eur_usd)
     elif moneda == "USD":
-        monto_eur = monto / st.session_state.tasas["ARS"]
+        monto_eur = monto / eur_usd
     elif moneda == "USDT":
-        monto_eur = monto * st.session_state.tasas["USDT"]
+        monto_eur = monto / eur_usd  # USDT ~ USD
 
     st.session_state.gastos.append({
         "monto": monto, "moneda": moneda, "monto_eur": monto_eur,
         "cat": cat, "sub": sub, "desc": desc,
         "fecha": datetime.now().strftime("%d/%m/%Y")
     })
-    st.success(f"Guardado: {monto} {moneda} → €{monto_eur:.2f}")
+    st.success(f"✅ Guardado: {monto} {moneda} → €{monto_eur:.2f}")
 
 # --- ANÁLISIS ---
 if st.session_state.gastos:
@@ -123,16 +129,16 @@ if st.session_state.gastos:
     col2.metric("Restante", f"€{restante:.2f}")
 
     if restante < 0:
-        st.error("¡No alcanzarás los 150€ de ahorro!")
+        st.error("🚨 ¡No alcanzarás los 150€ de ahorro!")
     elif restante < 50:
-        st.warning("¡Cuidado! Ajusta gastos.")
+        st.warning("⚠️ ¡Cuidado! Ajusta gastos.")
     else:
-        st.success("¡Vas bien para ahorrar 150€!")
+        st.success("🎉 ¡Vas bien para ahorrar 150€!")
 
     # Gráfico
-    cats = {g["cat"]: 0 for g in st.session_state.gastos}
+    cats = {}
     for g in st.session_state.gastos:
-        cats[g["cat"]] += g["monto_eur"]
+        cats[g["cat"]] = cats.get(g["cat"], 0) + g["monto_eur"]
     if cats:
         fig, ax = plt.subplots()
         ax.pie(cats.values(), labels=cats.keys(), autopct='%1.1f%%')
@@ -140,35 +146,48 @@ if st.session_state.gastos:
         st.pyplot(fig)
 
 # --- CONVERTIDOR RÁPIDO ---
-st.subheader("Convertidor Rápido")
+st.subheader("🔄 Convertidor Rápido")
 monto_conv = st.number_input("Monto a convertir", min_value=0.0)
-de = st.selectbox("De", ["EUR", "ARS", "USD", "USDT"], key="de")
-a = st.selectbox("A", ["ARS", "EUR", "USD", "USDT"], key="a")
+de = st.selectbox("De", ["EUR", "ARS", "USD", "USDT"])
+a = st.selectbox("A", ["ARS", "EUR", "USD", "USDT"])
 
-if monto_conv > 0:
-    if de == a:
-        resultado = monto_conv
-    elif de == "EUR" and a == "ARS":
-        resultado = monto_conv * st.session_state.tasas["ARS"] * st.session_state.tasas["USDT"]
-    elif de == "ARS" and a == "EUR":
-        resultado = monto_conv / (st.session_state.tasas["ARS"] * st.session_state.tasas["USDT"])
-    elif de == "USD" and a == "ARS":
-        resultado = monto_conv * st.session_state.tasas["ARS"]
-    elif de == "ARS" and a == "USD":
-        resultado = monto_conv / st.session_state.tasas["ARS"]
-    elif de == "USDT" and a == "ARS":
-        resultado = monto_conv * st.session_state.tasas["ARS"]
-    elif de == "ARS" and a == "USDT":
-        resultado = monto_conv / st.session_state.tasas["ARS"]
-    elif de == "EUR" and a == "USDT":
-        resultado = monto_conv * st.session_state.tasas["USDT"]
-    elif de == "USDT" and a == "EUR":
-        resultado = monto_conv / st.session_state.tasas["USDT"]
-    else:
-        resultado = monto_conv
+if monto_conv > 0 and de != a:
+    if de == "EUR":
+        if a == "ARS":
+            resultado = monto_conv * usd_ars * eur_usd
+        elif a == "USD":
+            resultado = monto_conv * eur_usd
+        elif a == "USDT":
+            resultado = monto_conv * eur_usd
+    elif de == "ARS":
+        if a == "EUR":
+            resultado = monto_conv / (usd_ars * eur_usd)
+        elif a == "USD":
+            resultado = monto_conv / usd_ars
+        elif a == "USDT":
+            resultado = monto_conv / usd_ars
+    elif de == "USD":
+        if a == "ARS":
+            resultado = monto_conv * usd_ars
+        elif a == "EUR":
+            resultado = monto_conv / eur_usd
+        elif a == "USDT":
+            resultado = monto_conv
+    elif de == "USDT":
+        if a == "ARS":
+            resultado = monto_conv * usd_ars
+        elif a == "EUR":
+            resultado = monto_conv / eur_usd
+        elif a == "USD":
+            resultado = monto_conv
 
-    st.write(f"**{monto_conv:,.2f} {de} = {resultado:,.2f} {a}**")
+    st.success(f"**{monto_conv:,.2f} {de} = {resultado:,.2f} {a}**")
 
 # --- EXPORTAR ---
-if st.button("Exportar datos"):
-    st.download_button("Descargar JSON", json.dumps(st.session_state.gastos, indent=2), "gastos.json")
+if st.button("📥 Exportar datos"):
+    datos = {
+        "ingresos": st.session_state.ingresos,
+        "gastos": st.session_state.gastos,
+        "tasas": st.session_state.tasas
+    }
+    st.download_button("Descargar JSON", json.dumps(datos, indent=2), "ahorrosmart.json")
