@@ -7,7 +7,6 @@ import pandas as pd
 from io import BytesIO
 import base64
 import pytz
-import time
 
 # --- CONFIGURACIÓN ---
 st.set_page_config(page_title="AhorroSmart", layout="wide")
@@ -42,11 +41,11 @@ def obtener_cotizaciones():
     except:
         st.warning("Usando tasas simuladas")
 
-# --- FUNCIÓN RELOJES ---
-def mostrar_relojes():
-    st.subheader("🕐 Relojes Mundiales (Actualizados en vivo)")
-    col1, col2, col3 = st.columns(3)
-    
+# --- RELOJES EN VIVO (sin recargar todo) ---
+st.subheader("Relojes Mundiales (Actualizados en vivo)")
+
+placeholder = st.empty()
+with placeholder.container():
     tz_ny = pytz.timezone("America/New_York")
     tz_arg = pytz.timezone("America/Argentina/Buenos_Aires")
     tz_esp = pytz.timezone("Europe/Madrid")
@@ -55,16 +54,10 @@ def mostrar_relojes():
     now_arg = datetime.now(tz_arg).strftime("%H:%M:%S")
     now_esp = datetime.now(tz_esp).strftime("%H:%M:%S")
     
-    with col1:
-        st.metric("🇺🇸 Nueva York", now_ny)
-    with col2:
-        st.metric("🇦🇷 Argentina", now_arg)
-    with col3:
-        st.metric("🇪🇸 España", now_esp)
-    
-    # Auto-refrescar cada 1 segundo
-    time.sleep(1)
-    st.rerun()
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Nueva York", now_ny)
+    col2.metric("Argentina", now_arg)
+    col3.metric("España", now_esp)
 
 # --- SIDEBAR ---
 with st.sidebar:
@@ -81,9 +74,6 @@ with st.sidebar:
 
     if st.button("Actualizar cotizaciones"):
         obtener_cotizaciones()
-
-# --- RELOJES EN VIVO ---
-mostrar_relojes()
 
 # --- COTIZACIONES ---
 st.subheader("Cotizaciones")
@@ -172,7 +162,6 @@ if st.session_state.gastos:
         ax.set_xlabel("Categoría")
         plt.xticks(rotation=45, ha='right')
         
-        # Añadir valores encima de las barras
         for bar in bars:
             height = bar.get_height()
             ax.text(bar.get_x() + bar.get_width()/2., height + max(valores)*0.01,
@@ -189,5 +178,8 @@ if st.session_state.gastos:
         df.to_excel(writer, index=False, sheet_name='Gastos')
     output.seek(0)
     b64 = base64.b64encode(output.read()).decode()
-    href = f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" download="gastos_ahorrosmart.xlsx">📥 Descargar Excel</a>'
+    href = f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" download="gastos_ahorrosmart.xlsx">Descargar Excel</a>'
     st.markdown(href, unsafe_allow_html=True)
+
+# --- AUTO-REFRESH RELOJES ---
+st.experimental_rerun()
