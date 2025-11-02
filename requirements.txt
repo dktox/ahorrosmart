@@ -4,3 +4,9 @@ requests
 pandas
 openpyxl
 pytz
+pytesseract
+opencv-python-headless
+Pillow
+streamlit-authenticator
+pyyaml
+smtplib
