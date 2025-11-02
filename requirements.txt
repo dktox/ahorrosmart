@@ -8,5 +8,5 @@ pytesseract
 opencv-python-headless
 Pillow
 streamlit-authenticator
-pyyaml
+PyYAML
 smtplib
