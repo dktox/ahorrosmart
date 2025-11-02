@@ -1,3 +1,6 @@
 streamlit
 matplotlib
 requests
+pandas
+openpyxl
+pytz
