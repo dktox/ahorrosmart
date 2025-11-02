@@ -3,10 +3,15 @@ import matplotlib.pyplot as plt
 import requests
 from datetime import datetime
 import json
+import pandas as pd
+from io import BytesIO
+import base64
+import pytz
+import time
 
 # --- CONFIGURACIÓN ---
 st.set_page_config(page_title="AhorroSmart", layout="wide")
-st.title("AhorroSmart - Control de Gastos + Cotizaciones en Vivo")
+st.title("AhorroSmart - Gastos + Cotizaciones + Relojes Mundiales")
 
 # --- INICIALIZAR DATOS ---
 if 'ingresos' not in st.session_state:
@@ -24,61 +29,79 @@ if 'categorias' not in st.session_state:
         "IA": ["ChatGPT", "Herramientas"]
     }
 if 'tasas' not in st.session_state:
-    st.session_state.tasas = {"EUR_USD": 1.08, "USD_ARS": 950, "USDT_USD": 1.0}
+    st.session_state.tasas = {"EUR_USD": 1.08, "USD_ARS": 950}
 
-# --- FUNCIÓN PARA COTIZACIONES REALES ---
-def obtener_cotizaciones_reales():
+# --- FUNCIÓN COTIZACIONES ---
+def obtener_cotizaciones():
     try:
-        # EUR/USD de exchangerate-api
-        url_eur = "https://api.exchangerate-api.com/v4/latest/EUR"
-        data_eur = requests.get(url_eur).json()
-        eur_usd = data_eur['rates']['USD']
-        st.session_state.tasas["EUR_USD"] = eur_usd
-
-        # USD/ARS de exchangerate-api (tasa de mercado)
-        url_ars = "https://api.exchangerate-api.com/v4/latest/USD"
-        data_ars = requests.get(url_ars).json()
-        usd_ars = data_ars['rates']['ARS']
-        st.session_state.tasas["USD_ARS"] = usd_ars
-
-        # USDT/USD ~1 (fijo, ya que es stablecoin)
-        st.session_state.tasas["USDT_USD"] = 1.0
-
-        st.success("✅ Cotizaciones actualizadas (exchangerate-api)")
+        eur_data = requests.get("https://api.exchangerate-api.com/v4/latest/EUR").json()
+        usd_data = requests.get("https://api.exchangerate-api.com/v4/latest/USD").json()
+        st.session_state.tasas["EUR_USD"] = eur_data['rates']['USD']
+        st.session_state.tasas["USD_ARS"] = usd_data['rates']['ARS']
+        st.success("Cotizaciones actualizadas")
     except:
-        st.warning("⚠️ Error de conexión - usando tasas simuladas")
+        st.warning("Usando tasas simuladas")
+
+# --- FUNCIÓN RELOJES ---
+def mostrar_relojes():
+    st.subheader("🕐 Relojes Mundiales (Actualizados en vivo)")
+    col1, col2, col3 = st.columns(3)
+    
+    tz_ny = pytz.timezone("America/New_York")
+    tz_arg = pytz.timezone("America/Argentina/Buenos_Aires")
+    tz_esp = pytz.timezone("Europe/Madrid")
+    
+    now_ny = datetime.now(tz_ny).strftime("%H:%M:%S")
+    now_arg = datetime.now(tz_arg).strftime("%H:%M:%S")
+    now_esp = datetime.now(tz_esp).strftime("%H:%M:%S")
+    
+    with col1:
+        st.metric("🇺🇸 Nueva York", now_ny)
+    with col2:
+        st.metric("🇦🇷 Argentina", now_arg)
+    with col3:
+        st.metric("🇪🇸 España", now_esp)
+    
+    # Auto-refrescar cada 1 segundo
+    time.sleep(1)
+    st.rerun()
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.header("⚙️ Configuración")
+    st.header("Configuración")
     st.session_state.ingresos["sueldo"] = st.number_input("Sueldo (€)", value=1800.0)
     st.session_state.ingresos["freelance"] = st.number_input("Freelance (€)", value=250.0)
-    if st.button("🔄 Actualizar cotizaciones"):
-        obtener_cotizaciones_reales()
+    
+    st.subheader("Agregar Categoría")
+    nueva_cat = st.text_input("Nombre")
+    nuevas_sub = st.text_area("Subcategorías (una por línea)").splitlines()
+    if st.button("Agregar") and nueva_cat:
+        st.session_state.categorias[nueva_cat] = [s.strip() for s in nuevas_sub if s.strip()]
+        st.success(f"Agregada: {nueva_cat}")
 
-# --- COTIZACIONES EN VIVO ---
-st.subheader("📈 Cotizaciones en Tiempo Real")
+    if st.button("Actualizar cotizaciones"):
+        obtener_cotizaciones()
+
+# --- RELOJES EN VIVO ---
+mostrar_relojes()
+
+# --- COTIZACIONES ---
+st.subheader("Cotizaciones")
 if st.button("Forzar actualización"):
-    obtener_cotizaciones_reales()
+    obtener_cotizaciones()
 
-# Tasas calculadas
 eur_usd = st.session_state.tasas["EUR_USD"]
 usd_ars = st.session_state.tasas["USD_ARS"]
-usdt_usd = st.session_state.tasas["USDT_USD"]
 
 col1, col2, col3, col4 = st.columns(4)
 with col1:
     st.metric("USD → ARS", f"1 USD = {usd_ars:,.0f} ARS")
-    st.metric("ARS → USD", f"1 ARS = {1/usd_ars:.6f} USD")
 with col2:
     st.metric("EUR → ARS", f"1 EUR = {eur_usd * usd_ars:,.0f} ARS")
-    st.metric("ARS → EUR", f"1 ARS = {1/(eur_usd * usd_ars):.6f} EUR")
 with col3:
-    st.metric("USDT → ARS", f"1 USDT = {usdt_usd * usd_ars:,.0f} ARS")
-    st.metric("ARS → USDT", f"1 ARS = {1/(usdt_usd * usd_ars):.6f} USDT")
+    st.metric("USDT → ARS", f"1 USDT = {usd_ars:,.0f} ARS")
 with col4:
-    st.metric("EUR → USDT", f"1 EUR = {eur_usd / usdt_usd:.4f} USDT")
-    st.metric("USDT → EUR", f"1 USDT = {usdt_usd / eur_usd:.4f} EUR")
+    st.metric("EUR → USDT", f"1 EUR = {eur_usd:.4f} USDT")
 
 # --- CÁLCULOS ---
 total_ingresos = sum(st.session_state.ingresos.values())
@@ -91,7 +114,7 @@ col2.metric("Ahorro Objetivo", f"€{ahorro_objetivo}")
 col3.metric("Para Gastos", f"€{presupuesto:,.2f}")
 
 # --- AGREGAR GASTO ---
-st.subheader("➕ Agregar Gasto")
+st.subheader("Agregar Gasto")
 c1, c2 = st.columns(2)
 with c1:
     monto = st.number_input("Monto", min_value=0.01)
@@ -101,8 +124,7 @@ with c2:
     sub = st.selectbox("Subcategoría", st.session_state.categorias[cat])
 desc = st.text_input("Descripción")
 
-if st.button("💾 Guardar Gasto"):
-    # Convertir a EUR
+if st.button("Guardar Gasto"):
     if moneda == "EUR":
         monto_eur = monto
     elif moneda == "ARS":
@@ -110,84 +132,62 @@ if st.button("💾 Guardar Gasto"):
     elif moneda == "USD":
         monto_eur = monto / eur_usd
     elif moneda == "USDT":
-        monto_eur = monto / eur_usd  # USDT ~ USD
+        monto_eur = monto / eur_usd
 
     st.session_state.gastos.append({
         "monto": monto, "moneda": moneda, "monto_eur": monto_eur,
         "cat": cat, "sub": sub, "desc": desc,
         "fecha": datetime.now().strftime("%d/%m/%Y")
     })
-    st.success(f"✅ Guardado: {monto} {moneda} → €{monto_eur:.2f}")
+    st.success(f"Guardado: {monto} {moneda} → €{monto_eur:.2f}")
 
-# --- ANÁLISIS ---
+# --- GRÁFICO DE BARRAS ---
 if st.session_state.gastos:
     total_gastos = sum(g["monto_eur"] for g in st.session_state.gastos)
     restante = presupuesto - total_gastos
 
     col1, col2 = st.columns(2)
-    col1.metric("Gastado", f"€{total_gastos:.2f}")
-    col2.metric("Restante", f"€{restante:.2f}")
+    col1.metric("Gastado", f"€{total_gastos:,.2f}")
+    col2.metric("Restante", f"€{restante:,.2f}")
 
     if restante < 0:
-        st.error("🚨 ¡No alcanzarás los 150€ de ahorro!")
+        st.error("¡No alcanzarás los 150€!")
     elif restante < 50:
-        st.warning("⚠️ ¡Cuidado! Ajusta gastos.")
+        st.warning("¡Cuidado!")
     else:
-        st.success("🎉 ¡Vas bien para ahorrar 150€!")
+        st.success("¡Vas bien!")
 
-    # Gráfico
+    # GRÁFICO DE BARRAS
     cats = {}
     for g in st.session_state.gastos:
         cats[g["cat"]] = cats.get(g["cat"], 0) + g["monto_eur"]
+    
     if cats:
-        fig, ax = plt.subplots()
-        ax.pie(cats.values(), labels=cats.keys(), autopct='%1.1f%%')
-        ax.set_title("Gastos por Categoría")
+        fig, ax = plt.subplots(figsize=(10, 6))
+        categorias = list(cats.keys())
+        valores = list(cats.values())
+        bars = ax.bar(categorias, valores, color='skyblue', edgecolor='navy')
+        ax.set_title("Gastos por Categoría (€)", fontsize=16, fontweight='bold')
+        ax.set_ylabel("Monto en Euros (€)")
+        ax.set_xlabel("Categoría")
+        plt.xticks(rotation=45, ha='right')
+        
+        # Añadir valores encima de las barras
+        for bar in bars:
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height + max(valores)*0.01,
+                    f'€{height:,.0f}', ha='center', va='bottom', fontsize=10)
+        
+        plt.tight_layout()
         st.pyplot(fig)
 
-# --- CONVERTIDOR RÁPIDO ---
-st.subheader("🔄 Convertidor Rápido")
-monto_conv = st.number_input("Monto a convertir", min_value=0.0)
-de = st.selectbox("De", ["EUR", "ARS", "USD", "USDT"])
-a = st.selectbox("A", ["ARS", "EUR", "USD", "USDT"])
-
-if monto_conv > 0 and de != a:
-    if de == "EUR":
-        if a == "ARS":
-            resultado = monto_conv * usd_ars * eur_usd
-        elif a == "USD":
-            resultado = monto_conv * eur_usd
-        elif a == "USDT":
-            resultado = monto_conv * eur_usd
-    elif de == "ARS":
-        if a == "EUR":
-            resultado = monto_conv / (usd_ars * eur_usd)
-        elif a == "USD":
-            resultado = monto_conv / usd_ars
-        elif a == "USDT":
-            resultado = monto_conv / usd_ars
-    elif de == "USD":
-        if a == "ARS":
-            resultado = monto_conv * usd_ars
-        elif a == "EUR":
-            resultado = monto_conv / eur_usd
-        elif a == "USDT":
-            resultado = monto_conv
-    elif de == "USDT":
-        if a == "ARS":
-            resultado = monto_conv * usd_ars
-        elif a == "EUR":
-            resultado = monto_conv / eur_usd
-        elif a == "USD":
-            resultado = monto_conv
-
-    st.success(f"**{monto_conv:,.2f} {de} = {resultado:,.2f} {a}**")
-
-# --- EXPORTAR ---
-if st.button("📥 Exportar datos"):
-    datos = {
-        "ingresos": st.session_state.ingresos,
-        "gastos": st.session_state.gastos,
-        "tasas": st.session_state.tasas
-    }
-    st.download_button("Descargar JSON", json.dumps(datos, indent=2), "ahorrosmart.json")
+# --- EXPORTAR A EXCEL ---
+if st.session_state.gastos:
+    df = pd.DataFrame(st.session_state.gastos)
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Gastos')
+    output.seek(0)
+    b64 = base64.b64encode(output.read()).decode()
+    href = f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" download="gastos_ahorrosmart.xlsx">📥 Descargar Excel</a>'
+    st.markdown(href, unsafe_allow_html=True)
