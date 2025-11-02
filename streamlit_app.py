@@ -7,10 +7,11 @@ import pandas as pd
 from io import BytesIO
 import base64
 import pytz
+import time
 
 # --- CONFIGURACIÓN ---
-st.set_page_config(page_title="AhorroSmart", layout="wide")
-st.title("AhorroSmart - Gastos + Cotizaciones + Relojes Mundiales")
+st.set_page_config(page_title="AhorroSMART", layout="wide")
+st.title("AhorroSMART - Gastos + Cotizaciones + Relojes")
 
 # --- INICIALIZAR DATOS ---
 if 'ingresos' not in st.session_state:
@@ -41,7 +42,7 @@ def obtener_cotizaciones():
     except:
         st.warning("Usando tasas simuladas")
 
-# --- RELOJES EN VIVO (sin recargar todo) ---
+# --- RELOJES EN VIVO (sin bucle) ---
 st.subheader("Relojes Mundiales (Actualizados en vivo)")
 
 placeholder = st.empty()
@@ -181,5 +182,6 @@ if st.session_state.gastos:
     href = f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" download="gastos_ahorrosmart.xlsx">Descargar Excel</a>'
     st.markdown(href, unsafe_allow_html=True)
 
-# --- AUTO-REFRESH RELOJES ---
-st.experimental_rerun()
+# --- AUTO-REFRESH RELOJES (solo el contenedor) ---
+time.sleep(1)
+placeholder.empty()
