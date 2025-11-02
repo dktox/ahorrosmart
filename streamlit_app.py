@@ -2,12 +2,14 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import requests
 from datetime import datetime
-import json
 import pandas as pd
 from io import BytesIO
 import base64
 import pytz
-import time
+from streamlit_autorefresh import st_autorefresh
+
+# --- AUTO-REFRESH CADA 1 SEGUNDO (solo relojes) ---
+st_autorefresh(interval=1000, key="relojes")
 
 # --- CONFIGURACIÓN ---
 st.set_page_config(page_title="AhorroSMART", layout="wide")
@@ -42,23 +44,21 @@ def obtener_cotizaciones():
     except:
         st.warning("Usando tasas simuladas")
 
-# --- RELOJES EN VIVO (sin bucle) ---
+# --- RELOJES EN VIVO ---
 st.subheader("Relojes Mundiales (Actualizados en vivo)")
 
-placeholder = st.empty()
-with placeholder.container():
-    tz_ny = pytz.timezone("America/New_York")
-    tz_arg = pytz.timezone("America/Argentina/Buenos_Aires")
-    tz_esp = pytz.timezone("Europe/Madrid")
-    
-    now_ny = datetime.now(tz_ny).strftime("%H:%M:%S")
-    now_arg = datetime.now(tz_arg).strftime("%H:%M:%S")
-    now_esp = datetime.now(tz_esp).strftime("%H:%M:%S")
-    
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Nueva York", now_ny)
-    col2.metric("Argentina", now_arg)
-    col3.metric("España", now_esp)
+tz_ny = pytz.timezone("America/New_York")
+tz_arg = pytz.timezone("America/Argentina/Buenos_Aires")
+tz_esp = pytz.timezone("Europe/Madrid")
+
+now_ny = datetime.now(tz_ny).strftime("%H:%M:%S")
+now_arg = datetime.now(tz_arg).strftime("%H:%M:%S")
+now_esp = datetime.now(tz_esp).strftime("%H:%M:%S")
+
+col1, col2, col3 = st.columns(3)
+col1.metric("Nueva York", now_ny)
+col2.metric("Argentina", now_arg)
+col3.metric("España", now_esp)
 
 # --- SIDEBAR ---
 with st.sidebar:
@@ -181,7 +181,3 @@ if st.session_state.gastos:
     b64 = base64.b64encode(output.read()).decode()
     href = f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" download="gastos_ahorrosmart.xlsx">Descargar Excel</a>'
     st.markdown(href, unsafe_allow_html=True)
-
-# --- AUTO-REFRESH RELOJES (solo el contenedor) ---
-time.sleep(1)
-placeholder.empty()
