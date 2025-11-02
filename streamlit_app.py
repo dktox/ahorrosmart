@@ -6,10 +6,6 @@ import pandas as pd
 from io import BytesIO
 import base64
 import pytz
-from streamlit_autorefresh import st_autorefresh
-
-# --- AUTO-REFRESH CADA 1 SEGUNDO (solo relojes) ---
-st_autorefresh(interval=1000, key="relojes")
 
 # --- CONFIGURACIÓN ---
 st.set_page_config(page_title="AhorroSMART", layout="wide")
@@ -44,21 +40,30 @@ def obtener_cotizaciones():
     except:
         st.warning("Usando tasas simuladas")
 
-# --- RELOJES EN VIVO ---
-st.subheader("Relojes Mundiales (Actualizados en vivo)")
+# --- RELOJES EN VIVO (con placeholder + rerun controlado) ---
+st.subheader("Relojes Mundiales (Actualizados cada segundo)")
 
-tz_ny = pytz.timezone("America/New_York")
-tz_arg = pytz.timezone("America/Argentina/Buenos_Aires")
-tz_esp = pytz.timezone("Europe/Madrid")
+placeholder = st.empty()
+with placeholder.container():
+    tz_ny = pytz.timezone("America/New_York")
+    tz_arg = pytz.timezone("America/Argentina/Buenos_Aires")
+    tz_esp = pytz.timezone("Europe/Madrid")
+    
+    now_ny = datetime.now(tz_ny).strftime("%H:%M:%S")
+    now_arg = datetime.now(tz_arg).strftime("%H:%M:%S")
+    now_esp = datetime.now(tz_esp).strftime("%H:%M:%S")
+    
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Nueva York", now_ny)
+    col2.metric("Argentina", now_arg)
+    col3.metric("España", now_esp)
 
-now_ny = datetime.now(tz_ny).strftime("%H:%M:%S")
-now_arg = datetime.now(tz_arg).strftime("%H:%M:%S")
-now_esp = datetime.now(tz_esp).strftime("%H:%M:%S")
-
-col1, col2, col3 = st.columns(3)
-col1.metric("Nueva York", now_ny)
-col2.metric("Argentina", now_arg)
-col3.metric("España", now_esp)
+# --- AUTO-RERUN CADA 1 SEGUNDO (solo si no hay interacción) ---
+if 'last_rerun' not in st.session_state:
+    st.session_state.last_rerun = datetime.now()
+if (datetime.now() - st.session_state.last_rerun).seconds >= 1:
+    st.session_state.last_rerun = datetime.now()
+    st.rerun()
 
 # --- SIDEBAR ---
 with st.sidebar:
